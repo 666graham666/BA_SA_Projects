@@ -12,4 +12,4 @@
 
 - `TBank.yaml` – спецификация API в формате OpenAPI (Swagger).
 - `database.sql` – скрипт создания базы данных.
-- `ER_diagram.png` – ER-диаграмма связей.
+- `ER_diagram.jpg` – ER-диаграмма связей.
