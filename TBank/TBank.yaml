@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: Payment Blocking Service
+  version: "1.0.0"
+  description: >
+    Сервис для управления блокировками платежей клиентов (юр. лиц).
+      - Блокировать платежи клиента,
+      - Проверять статус блокировки,
+      - Разблокировать клиента,
+      - Хранить и различать причины блокировок
+servers:
+  - url: https://api.t-bank.ru/v1
+    description: Продакшен
+  - url: https://sandbox.t-bank.ru/v1
+    description: Тестовая среда
+
+paths:
+  /blocks:
+    post:
+      summary: Создать блокировку платежей для клиента
+      description: >
+        Создаёт новую блокировку для конкретного клиента по указанной причине.
+      tags:
+        - Blocks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockCreateRequest"
+      responses:
+        '201':
+          description: Блокировка создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockResponse"
+        '400':
+          description: Ошибка валидации входных данных
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '409':
+          description: Клиент уже заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      summary: Получить список всех блокировок
+      description: >
+        Возвращает полный список всех блокировок.
+      tags:
+        - Blocks
+      parameters:
+        - in: query
+          name: clientId
+          schema:
+            type: string
+          required: false
+          description: Фильтр по клиенту
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+          required: false
+          description: Фильтр по статусу блокировки
+      responses:
+        '200':
+          description: Список блокировок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlockResponse"
+        '400':
+          description: Ошибка валидации параметров
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /blocks/{clientId}:
+    get:
+      summary: Проверить текущие активные блокировки клиента
+      description: >
+        Возвращает все активные блокировки клиента (или 404, у него их нет).
+      tags:
+        - Blocks
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          description: Уникальный идентификатор клиента
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Клиент имеет активную блокировку
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlocksForClient"
+        '404':
+          description: Нет активных блокировок у клиента или клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      summary: Разблокировать клиента
+      description: >
+        Ставит статус `INACTIVE` для активной блокировки.
+      tags:
+        - Blocks
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          description: Уникальный идентификатор клиента
+          schema:
+            type: string
+      requestBody:
+        description: коммент при разблокировке (необзательный параметр)
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockUpdateRequest"
+      responses:
+        '200':
+          description: Клиент разблокирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnblockResponse"
+        '404':
+          description: Активная блокировка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /blocks/history/{clientId}:
+    get:
+      summary: Получить историю блокировок клиента
+      description: >
+        Возвращает полную историю блокировок y клиента.
+      tags:
+        - Blocks
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          description: Уникальный идентификатор клиента
+          schema:
+            type: string
+      responses:
+        '200':
+          description: История блокировок клиента
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clientId:
+                    type: string
+                  blocks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlockResponse"
+        '404':
+          description: Блокировок не найдено или клиент не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    #запросы
+
+    BlockCreateRequest:
+      type: object
+      required:
+        - clientId
+        - blockType
+      properties:
+        clientId:
+          type: string
+          description: Идентификатор клиента
+          example: "31010-67890"
+        blockType:
+          type: string
+          enum: [FRAUD, TECHNICAL_ERROR, OTHER]
+          description: Тип блокировки
+          example: "FRAUD"
+        comment:
+          type: string
+          description: Доп комментарий
+          example: "Подозрение на мошенничество!!!"
+
+    BlockUpdateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Причина снятия блокировки
+          example: "Блокировка не требуется"
+
+    #ответы
+
+    BlockResponse:
+      type: object
+      properties:
+        blockId:
+          type: string
+          description: Уникальный идентификатор записи о блокировке
+          example: "b123e4567-e89b-12d3-a456-426614174000"
+        clientId:
+          type: string
+          description: Идентификатор клиента
+          example: "31010-67890"
+        blockType:
+          type: string
+          enum: [FRAUD, TECHNICAL_ERROR, OTHER]
+          description: Тип блокировки
+          example: "FRAUD"
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          description: Текущий статус блокировки
+          example: "ACTIVE"
+        comment:
+          type: string
+          description: Комментарий к блокировке
+          example: "Подозрение на мошенничество!!!"
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата создания блокировки
+          example: "2024-01-01T12:34:56Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Дата последнего изменения статуса
+          example: "2024-01-02T08:00:00Z"
+
+    BlocksForClient:
+      type: object
+      properties:
+        clientId:
+          type: string
+          example: "31010-67890"
+        isBlocked:
+          type: boolean
+          example: true
+        activeBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlockResponse"
+
+    UnblockResponse:
+      type: object
+      properties:
+        clientId:
+          type: string
+          description: Идентификатор клиента
+          example: "31010-67890"
+        changedBlocks:
+          type: array
+          description: Список разблокированных записей
+          items:
+            $ref: "#/components/schemas/BlockResponse"
+    ErrorResponse:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "Некорректные параметры запроса"
+        details:
+          type: string
+          example: "Поле clientId не может быть пустым"
