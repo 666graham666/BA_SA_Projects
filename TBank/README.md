@@ -10,6 +10,6 @@
 
 ## Структура репозитория
 
-- `swagger.yaml` – спецификация API в формате OpenAPI (Swagger).
+- `TBank.yaml` – спецификация API в формате OpenAPI (Swagger).
 - `database.sql` – скрипт создания базы данных.
 - `ER_diagram.png` – ER-диаграмма связей.
